@@ -1,0 +1,10 @@
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+const executable = process.env.MYSQLD_PATH || 'C:/Program Files/MySQL/MySQL Server 8.4/bin/mysqld.exe';
+const directory = path.resolve('.local/mysql');
+if (!existsSync(executable) || !existsSync(path.join(directory, 'mysql'))) throw new Error('This helper starts only the existing workspace MySQL instance. For a fresh installation, configure your normal MySQL service and .env instead.');
+const child = spawn(executable, ['--no-defaults', `--basedir=${path.dirname(path.dirname(executable))}`, `--datadir=${directory}`, '--port=3307', '--bind-address=127.0.0.1', '--mysqlx=OFF', '--console'], { stdio: 'inherit', windowsHide: true });
+child.on('error', error => { console.error(error.message); process.exitCode = 1; });
+child.on('exit', code => { process.exitCode = code ?? 1; });
+for (const signal of ['SIGINT','SIGTERM']) process.on(signal, () => child.kill());

@@ -85,7 +85,7 @@ npm run test:e2e
 
 Browser tests require a separate empty database configured by `TEST_DB_NAME` (default `job_tracker_test`). They erase only that test database's app tables. Never point it at real data. They run the built frontend on port 3101. Grant the database user access to the separate test database before running these checks. The tests use Edge on Windows by default or `TEST_BROWSER_PATH` when supplied; on other systems, install the Playwright browser with `npx playwright install chromium`. Plain `npm test` runs unit checks without a database or browser.
 
-Project conventions live in `AGENTS.md` and `.agents/skills/tracker-structure/SKILL.md`.
+Project conventions live in `AGENTS.md`. Local `.agents/` skills are excluded from Git.
 
 ## GitHub and local data
 

@@ -28,3 +28,7 @@ test-results/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local agent skills
+.agent/
+.agents/

@@ -1,5 +1,11 @@
 # Project conventions
 
-For implementation, refactoring, and code review in this project, read and follow [.agents/skills/tracker-structure/SKILL.md](.agents/skills/tracker-structure/SKILL.md).
+Use React, Express, Tailwind, and MySQL with a hosted AI API. No Docker or email integration.
 
-Keep the feature structure consistent, prefer Tailwind with minimal custom CSS, and keep explanations concise. Create only files needed for the requested work.
+- Keep frontend domains in `client/src/features/` and backend domains in `server/src/features/`.
+- Reuse shared UI controls and prefer Tailwind with minimal custom CSS.
+- Keep database access and AI credentials on the server.
+- Preserve original uploads and submitted document versions.
+- Create only files needed for the requested work and keep explanations concise.
+
+If `.agents/skills/tracker-structure/SKILL.md` exists locally, read it for additional project guidance. Local agent skills are excluded from Git.

@@ -67,3 +67,25 @@ test('uploaded resume text survives preparation saving and legacy summaries are 
  assert.equal(legacy.content.summary,'Whole PDF text');
  assert.equal(publicDocument({...legacy,extractionWarning:undefined}).content.summary,'Whole PDF text');
 });
+
+
+test('AI profile URLs accept bare web domains without accepting unsafe schemes or changing resume facts',async()=>{
+ const {normalizeProfileUrls}=await import('../src/lib/ai.js');
+ const original={name:'Example Person',summary:'Original summary',links:[{label:'LinkedIn',url:'linkedin.com/in/example-person'}],projects:[{name:'Portfolio',url:'portfolio.example.test/project'}],certifications:[{name:'Certificate',url:''}]};
+ const value=profileSchema.parse(normalizeProfileUrls(original));
+ assert.equal(value.links[0].url,'https://linkedin.com/in/example-person');
+ assert.equal(value.projects[0].url,'https://portfolio.example.test/project');
+ assert.equal(value.certifications[0].url,'');
+ assert.equal(value.name,original.name);assert.equal(value.summary,original.summary);
+ assert.equal(original.links[0].url,'linkedin.com/in/example-person');
+ for(const url of ['javascript:alert(1)','data:text/html,test','not a web address','person@example.test'])assert.throws(()=>profileSchema.parse(normalizeProfileUrls({links:[{label:'Unsafe',url}]})));
+ assert.throws(()=>profileSchema.parse(normalizeProfileUrls({links:'invalid'})));
+});
+
+
+test('resume PDF formatting preserves separate achievement bullet lines',()=>{
+ const description='- Maintained workstations.\n- Resolved network issues.';
+ const html=documentHtml({type:'resume',title:'Resume',content:profileSchema.parse({name:'Example Person',experience:[{company:'Example Co',title:'Support Intern',description}]})},{template:'modern',paper:'A4',fontSize:11,margin:16});
+ assert.ok(html.includes('- Maintained workstations.<br>- Resolved network issues.'));
+ assert.equal(profileSchema.parse({experience:[{description}]}).experience[0].description,description);
+});

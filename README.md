@@ -60,6 +60,8 @@ Only selected request content is sent to the provider. API charges and provider 
 - **Documents:** resume/CV and cover letter viewers, draft editing, immutable versions, original downloads, and PDF exports.
 - **Dashboard:** charts from recorded applications with date filtering and next actions.
 
+Importing a PDF, DOCX, or TXT resume on Career profile uses your configured AI provider to fill the individual fields. Review the result and click Save profile. Missing values keep existing fields unchanged; provider failures preserve your draft and original upload. JSON Resume imports populate fields directly without an AI call.
+
 Template selection belongs to export. Exporting does not submit an application. Original uploads and earlier document versions are preserved.
 
 ## Documents

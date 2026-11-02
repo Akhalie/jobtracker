@@ -5,12 +5,166 @@ import ProfileFields from './ProfileFields.jsx';
 import DocumentContent from './DocumentContent.jsx';
 import PdfPreview from './PdfPreview.jsx';
 import { Modal, Button, Field, Input, Textarea, Select, ErrorNote, Notice } from './ui/index.jsx';
-export default function DocumentViewer({ document:initialDocument,onClose,refresh }){
- const [doc,setDoc]=useState(initialDocument);
- const [editing,setEditing]=useState(false),[title,setTitle]=useState(doc.title),[content,setContent]=useState(doc.content),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[template,setTemplate]=useState(doc.template || 'classic'),[paper,setPaper]=useState(doc.paper || 'A4'),[file,setFile]=useState(doc.hasFile?doc.id:null),[viewFile,setViewFile]=useState(Boolean(doc.type==='resume' && doc.hasFile && typeof doc.content==='string' && /\.pdf$/i.test(doc.originalName||'')));
- async function save(){setBusy(true);setError('');try{const next=await api(`/documents/${doc.id}`,{method:'PATCH',body:{title,content}});setDoc(next);setContent(next.content);setTitle(next.title);setFile(next.hasFile?next.id:null);setViewFile(false);await refresh();setNotice('A new version was saved. You are viewing the new version; the original is unchanged.');setEditing(false)}catch(e){setError(e.message)}finally{setBusy(false)}}
- async function exportPdf(){setBusy(true);setError('');try{const d=await api(`/documents/${doc.id}/export`,{method:'POST',body:{template,paper,fontSize:11,margin:16}});setDoc(d);setFile(d.id);await refresh();setNotice('PDF exported as a new version. Use Download to save it.')}catch(e){setError(e.message)}finally{setBusy(false)}}
- return <Modal title={editing?'Edit a new document version':doc.title} wide onClose={onClose}><ErrorNote>{error}</ErrorNote><Notice>{notice}</Notice><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-slate-500">{doc.type==='resume'?'Resume / CV':'Cover letter'} · {dateText(doc.createdAt)}{doc.sourceId?' · Versioned document':''}</p><div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={()=>{if(editing){setTitle(doc.title);setContent(doc.content)}setEditing(!editing)}}><Pencil size={14}/>{editing?'Cancel editing':'Edit new version'}</Button>{file && <a className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold" href={`/api/documents/${file}/file?download=1`} target="_blank" rel="noreferrer"><Download size={14}/>Download</a>}</div></div>
- {editing?<div><Field label="Document title" className="mb-4"><Input value={title} onChange={e=>setTitle(e.target.value)}/></Field>{doc.type==='resume' && typeof content!=='string'?<ProfileFields value={normalizeProfile(content)} onChange={setContent}/>:<Field label={doc.type==='resume'?'Extracted resume text':'Cover letter'}><Textarea rows={18} value={typeof content==='string'?content:''} onChange={e=>setContent(e.target.value)}/></Field>}<Button className="mt-4" onClick={save} loading={busy}><Save size={14}/>Save new version</Button></div>:<><div className="mb-4 flex flex-wrap items-end gap-3"><Field label="Export template"><Select value={template} onChange={e=>setTemplate(e.target.value)}><option value="classic">Classic</option><option value="modern">Modern</option></Select></Field><Field label="Paper"><Select value={paper} onChange={e=>setPaper(e.target.value)}><option>A4</option><option>Letter</option></Select></Field><Button variant="secondary" onClick={exportPdf} loading={busy}><FileText size={14}/>Export PDF</Button>{doc.hasFile && <Button variant="secondary" onClick={()=>setViewFile(!viewFile)}>{viewFile?'View editable content':'View original file'}</Button>}</div>{viewFile && doc.hasFile && (!doc.originalName || /\.pdf$/i.test(doc.originalName))?<PdfPreview title="Document file preview" src={`/api/documents/${doc.id}/file`}/>:viewFile && doc.hasFile?<div className="rounded-lg bg-white p-6"><p className="mb-3 text-sm text-slate-500">This file type opens in its desktop application.</p><a href={`/api/documents/${doc.id}/file?download=1`} target="_blank" rel="noreferrer" className="text-brand underline">Download original file</a></div>:<div className="overflow-auto rounded-lg border border-slate-200 bg-slate-100 p-4"><DocumentContent content={doc.content} type={doc.type} template={template} paper={paper}/></div>}</>}
- </Modal>;
+
+export default function DocumentViewer({ document: initialDocument, onClose, refresh }) {
+  const [doc, setDoc] = useState(initialDocument);
+  const [editing, setEditing] = useState(false),
+    [title, setTitle] = useState(doc.title),
+    [content, setContent] = useState(doc.content),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(''),
+    [notice, setNotice] = useState(''),
+    [template, setTemplate] = useState(doc.template || 'classic'),
+    [paper, setPaper] = useState(doc.paper || 'A4'),
+    [file, setFile] = useState(doc.hasFile ? doc.id : null),
+    [viewFile, setViewFile] = useState(
+      Boolean(
+        doc.type === 'resume' &&
+        doc.hasFile &&
+        typeof doc.content === 'string' &&
+        /\.pdf$/i.test(doc.originalName || '')
+      )
+    );
+  async function save() {
+    setBusy(true);
+    setError('');
+    try {
+      const next = await api(`/documents/${doc.id}`, { method: 'PATCH', body: { title, content } });
+      setDoc(next);
+      setContent(next.content);
+      setTitle(next.title);
+      setFile(next.hasFile ? next.id : null);
+      setViewFile(false);
+      await refresh();
+      setNotice('A new version was saved. You are viewing the new version; the original is unchanged.');
+      setEditing(false);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function exportPdf() {
+    setBusy(true);
+    setError('');
+    try {
+      const d = await api(`/documents/${doc.id}/export`, {
+        method: 'POST',
+        body: { template, paper, fontSize: 11, margin: 16 }
+      });
+      setDoc(d);
+      setFile(d.id);
+      await refresh();
+      setNotice('PDF exported as a new version. Use Download to save it.');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal title={editing ? 'Edit a new document version' : doc.title} wide onClose={onClose}>
+      <ErrorNote>{error}</ErrorNote>
+      <Notice>{notice}</Notice>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-slate-500">
+          {doc.type === 'resume' ? 'Resume / CV' : 'Cover letter'} · {dateText(doc.createdAt)}
+          {doc.sourceId ? ' · Versioned document' : ''}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              if (editing) {
+                setTitle(doc.title);
+                setContent(doc.content);
+              }
+              setEditing(!editing);
+            }}
+          >
+            <Pencil size={14} />
+            {editing ? 'Cancel editing' : 'Edit new version'}
+          </Button>
+          {file && (
+            <a
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
+              href={`/api/documents/${file}/file?download=1`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Download size={14} />
+              Download
+            </a>
+          )}
+        </div>
+      </div>
+      {editing ? (
+        <div>
+          <Field label="Document title" className="mb-4">
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </Field>
+          {doc.type === 'resume' && typeof content !== 'string' ? (
+            <ProfileFields value={normalizeProfile(content)} onChange={setContent} />
+          ) : (
+            <Field label={doc.type === 'resume' ? 'Extracted resume text' : 'Cover letter'}>
+              <Textarea
+                rows={18}
+                value={typeof content === 'string' ? content : ''}
+                onChange={(e) => setContent(e.target.value)}
+              />
+            </Field>
+          )}
+          <Button className="mt-4" onClick={save} loading={busy}>
+            <Save size={14} />
+            Save new version
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="mb-4 flex flex-wrap items-end gap-3">
+            <Field label="Export template">
+              <Select value={template} onChange={(e) => setTemplate(e.target.value)}>
+                <option value="classic">Classic</option>
+                <option value="modern">Modern</option>
+              </Select>
+            </Field>
+            <Field label="Paper">
+              <Select value={paper} onChange={(e) => setPaper(e.target.value)}>
+                <option>A4</option>
+                <option>Letter</option>
+              </Select>
+            </Field>
+            <Button variant="secondary" onClick={exportPdf} loading={busy}>
+              <FileText size={14} />
+              Export PDF
+            </Button>
+            {doc.hasFile && (
+              <Button variant="secondary" onClick={() => setViewFile(!viewFile)}>
+                {viewFile ? 'View editable content' : 'View original file'}
+              </Button>
+            )}
+          </div>
+          {viewFile && doc.hasFile && (!doc.originalName || /\.pdf$/i.test(doc.originalName)) ? (
+            <PdfPreview title="Document file preview" src={`/api/documents/${doc.id}/file`} />
+          ) : viewFile && doc.hasFile ? (
+            <div className="rounded-lg bg-white p-6">
+              <p className="mb-3 text-sm text-slate-500">This file type opens in its desktop application.</p>
+              <a
+                href={`/api/documents/${doc.id}/file?download=1`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-brand underline"
+              >
+                Download original file
+              </a>
+            </div>
+          ) : (
+            <div className="overflow-auto rounded-lg border border-slate-200 bg-slate-100 p-4">
+              <DocumentContent content={doc.content} type={doc.type} template={template} paper={paper} />
+            </div>
+          )}
+        </>
+      )}
+    </Modal>
+  );
 }

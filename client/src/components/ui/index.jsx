@@ -1,17 +1,150 @@
 import { cloneElement, useEffect, useId, useRef } from 'react';
 import { X, LoaderCircle, Plus, FileText, ArrowUpRight } from 'lucide-react';
-export function Button({ children, variant = 'primary', className = '', loading, ...props }) { return <button {...props} disabled={loading || props.disabled} className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:opacity-45 ${variant === 'primary' ? 'bg-brand text-white hover:bg-[#1b564a]' : variant === 'danger' ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'} ${className}`}>{loading && <LoaderCircle size={15} className="animate-spin"/>}{children}</button>; }
-export function Field({ label, error, children, className = '' }) { const generatedId=useId();const id=children.props.id||generatedId;return <div className={`block text-sm font-medium text-slate-600 ${className}`}><label htmlFor={id} className="mb-1.5 block">{label}</label>{cloneElement(children,{id,...(error?{'aria-describedby':`${id}-error`,'aria-invalid':true}:{})})}{error && <span id={`${id}-error`} className="mt-1 text-xs text-rose-600">{error}</span>}</div>; }
-export const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/10';
-export function Input(props) { return <input className={inputClass} {...props}/>; }
-export function Textarea(props) { return <textarea rows={4} className={`${inputClass} resize-y`} {...props}/>; }
-export function Select(props) { return <select className={inputClass} {...props}/>; }
-export function Card({ children, className = '' }) { return <section className={`rounded-xl border border-slate-200/80 bg-white ${className}`}>{children}</section>; }
-export function PageHeader({ eyebrow, title, description, children }) { return <div className="mb-7 flex flex-wrap items-start justify-between gap-4"><div>{eyebrow && <p className="mb-2 text-[11px] font-bold uppercase tracking-[.18em] text-brand">{eyebrow}</p>}<h1 className="text-3xl font-semibold tracking-tight">{title}</h1>{description && <p className="mt-2 max-w-2xl text-sm text-slate-500">{description}</p>}</div>{children && <div className="flex flex-wrap gap-2 pt-2">{children}</div>}</div>; }
-export function Empty({ title, description, children, icon: Icon = FileText }) { return <div className="flex min-h-52 flex-col items-center justify-center px-6 py-10 text-center"><div className="mb-4 rounded-2xl bg-canvas p-4 text-brand"><Icon size={24}/></div><h3 className="font-semibold">{title}</h3><p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">{description}</p>{children && <div className="mt-5">{children}</div>}</div>; }
-export function ErrorNote({ children }) { return children ? <div role="alert" className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{children}</div> : null; }
-export function Notice({ children }) { return children ? <p role="status" className="my-3 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{children}</p> : null; }
-export function Badge({ children }) { const tone = ['Offer','Accepted'].includes(children) ? 'bg-emerald-50 text-emerald-700' : ['Rejected','Withdrawn'].includes(children) ? 'bg-rose-50 text-rose-700' : children === 'Interviewing' ? 'bg-amber-50 text-amber-700' : children === 'Applied' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'; return <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold ${tone}`}>{children}</span>; }
-export function Modal({ title, children, onClose, wide = false }) { const ref = useRef(); useEffect(() => { const previous = document.activeElement; ref.current.showModal(); const d = ref.current; const close = () => onClose(); d.addEventListener('cancel', close); return () => { d.removeEventListener('cancel', close); previous?.focus(); }; }, []); return <dialog ref={ref} aria-label={title} className={`m-auto max-h-[90vh] w-[calc(100%-2rem)] ${wide ? 'max-w-5xl' : 'max-w-2xl'} rounded-2xl border-0 bg-canvas p-0 text-ink shadow-2xl backdrop:bg-slate-950/50`}><header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4"><h2 className="text-lg font-semibold">{title}</h2><button onClick={onClose} aria-label="Close dialog" className="rounded-lg p-2 hover:bg-slate-100"><X size={20}/></button></header><div className="p-6">{children}</div></dialog>; }
-export function AddButton({ children, ...props }) { return <Button variant="secondary" {...props}><Plus size={15}/>{children}</Button>; }
-export function ExternalLink({ href, children }) { return <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-brand underline underline-offset-4">{children}<ArrowUpRight size={13}/></a>; }
+
+export function Button({ children, variant = 'primary', className = '', loading, ...props }) {
+  return (
+    <button
+      {...props}
+      disabled={loading || props.disabled}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:opacity-45 ${variant === 'primary' ? 'bg-brand text-white hover:bg-[#1b564a]' : variant === 'danger' ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'} ${className}`}
+    >
+      {loading && <LoaderCircle size={15} className="animate-spin" />}
+      {children}
+    </button>
+  );
+}
+export function Field({ label, error, children, className = '' }) {
+  const generatedId = useId();
+  const id = children.props.id || generatedId;
+  return (
+    <div className={`block text-sm font-medium text-slate-600 ${className}`}>
+      <label htmlFor={id} className="mb-1.5 block">
+        {label}
+      </label>
+      {cloneElement(children, { id, ...(error ? { 'aria-describedby': `${id}-error`, 'aria-invalid': true } : {}) })}
+      {error && (
+        <span id={`${id}-error`} className="mt-1 text-xs text-rose-600">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+export const inputClass =
+  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-ink placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/10';
+export function Input(props) {
+  return <input className={inputClass} {...props} />;
+}
+export function Textarea(props) {
+  return <textarea rows={4} className={`${inputClass} resize-y`} {...props} />;
+}
+export function Select(props) {
+  return <select className={inputClass} {...props} />;
+}
+export function Card({ children, className = '' }) {
+  return <section className={`rounded-xl border border-slate-200/80 bg-white ${className}`}>{children}</section>;
+}
+export function PageHeader({ eyebrow, title, description, children }) {
+  return (
+    <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
+      <div>
+        {eyebrow && <p className="mb-2 text-[11px] font-bold uppercase tracking-[.18em] text-brand">{eyebrow}</p>}
+        <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
+        {description && <p className="mt-2 max-w-2xl text-sm text-slate-500">{description}</p>}
+      </div>
+      {children && <div className="flex flex-wrap gap-2 pt-2">{children}</div>}
+    </div>
+  );
+}
+export function Empty({ title, description, children, icon: Icon = FileText }) {
+  return (
+    <div className="flex min-h-52 flex-col items-center justify-center px-6 py-10 text-center">
+      <div className="mb-4 rounded-2xl bg-canvas p-4 text-brand">
+        <Icon size={24} />
+      </div>
+      <h3 className="font-semibold">{title}</h3>
+      <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">{description}</p>
+      {children && <div className="mt-5">{children}</div>}
+    </div>
+  );
+}
+export function ErrorNote({ children }) {
+  return children ? (
+    <div role="alert" className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+      {children}
+    </div>
+  ) : null;
+}
+export function Notice({ children }) {
+  return children ? (
+    <p role="status" className="my-3 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+      {children}
+    </p>
+  ) : null;
+}
+export function Badge({ children }) {
+  const tone = ['Offer', 'Accepted'].includes(children)
+    ? 'bg-emerald-50 text-emerald-700'
+    : ['Rejected', 'Withdrawn'].includes(children)
+      ? 'bg-rose-50 text-rose-700'
+      : children === 'Interviewing'
+        ? 'bg-amber-50 text-amber-700'
+        : children === 'Applied'
+          ? 'bg-blue-50 text-blue-700'
+          : 'bg-slate-100 text-slate-600';
+  return (
+    <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold ${tone}`}>
+      {children}
+    </span>
+  );
+}
+export function Modal({ title, children, onClose, wide = false }) {
+  const ref = useRef();
+  useEffect(() => {
+    const previous = document.activeElement;
+    ref.current.showModal();
+    const d = ref.current;
+    const close = () => onClose();
+    d.addEventListener('cancel', close);
+    return () => {
+      d.removeEventListener('cancel', close);
+      previous?.focus();
+    };
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      aria-label={title}
+      className={`m-auto max-h-[90vh] w-[calc(100%-2rem)] ${wide ? 'max-w-5xl' : 'max-w-2xl'} rounded-2xl border-0 bg-canvas p-0 text-ink shadow-2xl backdrop:bg-slate-950/50`}
+    >
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <button onClick={onClose} aria-label="Close dialog" className="rounded-lg p-2 hover:bg-slate-100">
+          <X size={20} />
+        </button>
+      </header>
+      <div className="p-6">{children}</div>
+    </dialog>
+  );
+}
+export function AddButton({ children, ...props }) {
+  return (
+    <Button variant="secondary" {...props}>
+      <Plus size={15} />
+      {children}
+    </Button>
+  );
+}
+export function ExternalLink({ href, children }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1 text-sm text-brand underline underline-offset-4"
+    >
+      {children}
+      <ArrowUpRight size={13} />
+    </a>
+  );
+}

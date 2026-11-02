@@ -6,8 +6,19 @@
   --color-brand: #246b5d;
 }
 @layer base {
-  body { @apply m-0 bg-canvas font-sans text-ink antialiased; }
-  button:not(:disabled), a, select { cursor: pointer; }
-  button:disabled { cursor: not-allowed; }
-  :focus-visible { outline: 2px solid #246b5d; outline-offset: 3px; }
+  body {
+    @apply m-0 bg-canvas font-sans text-ink antialiased;
+  }
+  button:not(:disabled),
+  a,
+  select {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  :focus-visible {
+    outline: 2px solid #246b5d;
+    outline-offset: 3px;
+  }
 }

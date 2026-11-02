@@ -3,102 +3,195 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 
-test('MySQL authenticated workflow, document versions, export, and backup restore',{skip:process.env.RUN_DB_TESTS!=='true',timeout:90000},async()=>{
-  if(!process.env.DB_NAME?.endsWith('_test'))throw new Error('Integration tests require a dedicated DB_NAME ending in _test.');
-  const {pool}=await import('../src/lib/db.js');
-  const {migrate}=await import('../src/lib/migrate.js');
-  const [[actual]]=await pool.query('SELECT DATABASE() AS name');
-  assert.equal(actual.name,process.env.DB_NAME,'Refusing to test a different database.');
-  assert.ok(actual.name.endsWith('_test'));
-  await migrate();
-  for(const table of ['sessions','users','state','applications','documents'])await pool.execute(`DELETE FROM ${table}`);
-  const {app}=await import('../src/app.js');
-  const server=app.listen(0,'127.0.0.1');
-  await once(server,'listening');
-  const base=`http://127.0.0.1:${server.address().port}/api`;
-  let cookie='';
-  let provider;
-  async function request(route,method='GET',body) {
-    const response=await fetch(base+route,{method,headers:{...(cookie?{Cookie:cookie}:{}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
-    if(response.headers.get('set-cookie'))cookie=response.headers.get('set-cookie').split(';')[0];
-    const result=response.headers.get('content-type')?.includes('application/json')?await response.json():Buffer.from(await response.arrayBuffer());
-    return {response,result};
+test(
+  'MySQL authenticated workflow, document versions, export, and backup restore',
+  { skip: process.env.RUN_DB_TESTS !== 'true', timeout: 90000 },
+  async () => {
+    if (!process.env.DB_NAME?.endsWith('_test')) {
+      throw new Error('Integration tests require a dedicated DB_NAME ending in _test.');
+    }
+    const { pool } = await import('../src/lib/db.js');
+    const { migrate } = await import('../src/lib/migrate.js');
+    const [[actual]] = await pool.query('SELECT DATABASE() AS name');
+    assert.equal(actual.name, process.env.DB_NAME, 'Refusing to test a different database.');
+    assert.ok(actual.name.endsWith('_test'));
+    await migrate();
+    for (const table of ['sessions', 'users', 'state', 'applications', 'documents']) {
+      await pool.execute(`DELETE FROM ${table}`);
+    }
+    const { app } = await import('../src/app.js');
+    const server = app.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const base = `http://127.0.0.1:${server.address().port}/api`;
+    let cookie = '';
+    let provider;
+    async function request(route, method = 'GET', body) {
+      const response = await fetch(base + route, {
+        method,
+        headers: { ...(cookie ? { Cookie: cookie } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        ...(body ? { body: JSON.stringify(body) } : {})
+      });
+      if (response.headers.get('set-cookie')) {
+        cookie = response.headers.get('set-cookie').split(';')[0];
+      }
+      const result = response.headers.get('content-type')?.includes('application/json')
+        ? await response.json()
+        : Buffer.from(await response.arrayBuffer());
+      return { response, result };
+    }
+    try {
+      assert.equal((await request('/profile')).response.status, 401);
+      assert.equal((await request('/health')).result.setupRequired, true);
+      assert.equal(
+        (await request('/auth/setup', 'POST', { name: 'Test owner', password: 'correct-test-password' })).response
+          .status,
+        201
+      );
+      assert.equal((await request('/auth/session')).result.user.name, 'Test owner');
+      const profile = {
+        name: 'Test Person',
+        email: 'person@example.test',
+        summary: 'Built useful products.',
+        projects: [{ name: 'Tracker', technologies: 'React, MySQL' }]
+      };
+      assert.equal((await request('/profile', 'PUT', profile)).response.status, 200);
+      const document = (await request('/documents', 'POST', { type: 'resume', title: 'Test resume', content: profile }))
+        .result;
+      const application = (
+        await request('/applications', 'POST', { company: 'Example Co', role: 'Developer', documentIds: [document.id] })
+      ).result;
+      assert.ok(application.id);
+      assert.equal(
+        (await request(`/applications/${application.id}`, 'PATCH', { status: 'Applied', appliedAt: '2026-01-02' }))
+          .result.history.length,
+        2
+      );
+      assert.equal((await request(`/documents/${document.id}`, 'DELETE')).response.status, 409);
+      const edited = (await request(`/documents/${document.id}`, 'PATCH', { title: 'Revised resume' })).result;
+      assert.notEqual(edited.id, document.id);
+      assert.equal((await request(`/documents/${document.id}`)).result.title, 'Test resume');
+      const pdf = (
+        await request(`/documents/${edited.id}/export`, 'POST', {
+          template: 'modern',
+          paper: 'Letter',
+          fontSize: 11,
+          margin: 16
+        })
+      ).result;
+      assert.ok(pdf.id, pdf.error);
+      const file = await request(`/documents/${pdf.id}/file`);
+      assert.equal(file.response.status, 200);
+      assert.equal(file.result.subarray(0, 5).toString(), '%PDF-');
+      const unknown = await request('/ai', 'POST', { task: 'cover', job: { description: 'Job' } });
+      assert.equal(unknown.response.status, 503);
+      let providerResult = {
+        result: {
+          matches: ['Relevant experience'],
+          gaps: [],
+          suggestions: ['Explain project outcomes'],
+          keywords: ['React'],
+          score: 75
+        }
+      };
+      let lastAIRequest;
+      provider = createServer(async (req, res) => {
+        let body = '';
+        for await (const chunk of req) {
+          body += chunk;
+        }
+        lastAIRequest = { authorization: req.headers.authorization, body: JSON.parse(body) };
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(providerResult) } }] }));
+      }).listen(0, '127.0.0.1');
+      await once(provider, 'listening');
+      const settings = await request('/settings', 'PUT', {
+        aiBaseUrl: `http://127.0.0.1:${provider.address().port}/v1`,
+        aiModel: 'fixture-model',
+        aiApiKey: 'fixture-secret-key'
+      });
+      assert.equal(settings.response.status, 200);
+      assert.equal(settings.result.aiConfigured, true);
+      assert.ok(!JSON.stringify(settings.result).includes('fixture-secret-key'));
+      const compared = await request('/ai', 'POST', {
+        task: 'compare',
+        profile,
+        job: { description: 'React developer' }
+      });
+      assert.equal(compared.response.status, 200);
+      assert.equal(compared.result.result.score, 75);
+      assert.equal(lastAIRequest.authorization, 'Bearer fixture-secret-key');
+      assert.ok(lastAIRequest.body.messages[0].content.includes('Never invent'));
+      const { profileSchema } = await import('../src/lib/schemas.js');
+      const savedProfile = (await request('/profile')).result;
+      providerResult = {
+        result: profileSchema.parse({
+          name: 'Imported Person',
+          experience: [
+            {
+              company: 'Example Co',
+              title: 'Developer',
+              description: '- Built a dashboard.\n- Resolved support requests.'
+            }
+          ],
+          links: [{ label: 'Portfolio', url: 'https://portfolio.example.test' }],
+          skills: ['React'],
+          projects: [{ name: 'Portfolio' }]
+        })
+      };
+      providerResult.result.links[0].url = 'portfolio.example.test';
+      const extracted = await request('/ai', 'POST', {
+        task: 'profile',
+        text: 'Imported Person. React developer. Portfolio project.'
+      });
+      assert.equal(extracted.response.status, 200);
+      assert.equal(extracted.result.result.name, 'Imported Person');
+      assert.equal(
+        extracted.result.result.experience[0].description,
+        '- Built a dashboard.\n- Resolved support requests.'
+      );
+      assert.equal(extracted.result.result.links[0].url, 'https://portfolio.example.test/');
+      assert.equal(extracted.result.result.projects[0].name, 'Portfolio');
+      assert.ok(lastAIRequest.body.messages[0].content.includes('never put the whole resume there'));
+      assert.equal((await request('/ai', 'POST', { task: 'profile', text: '  ' })).response.status, 400);
+      providerResult = { result: {} };
+      assert.equal((await request('/ai', 'POST', { task: 'profile', text: 'Imported Person' })).response.status, 502);
+      assert.deepEqual((await request('/profile')).result, savedProfile);
+      const draftBefore = (await request('/preparation')).result;
+      providerResult = { result: {} };
+      const malformed = await request('/ai', 'POST', {
+        task: 'resume',
+        profile,
+        job: { description: 'React developer' }
+      });
+      assert.equal(malformed.response.status, 502);
+      assert.deepEqual((await request('/preparation')).result, draftBefore);
+      provider.close();
+      await once(provider, 'close');
+      assert.equal(
+        (await request('/ai', 'POST', { task: 'cover', profile, job: { description: 'React developer' } })).response
+          .status,
+        502
+      );
+      const backup = (await request('/backup')).result;
+      assert.equal(backup.documents.length, 3);
+      assert.ok(!JSON.stringify(backup).includes('password_hash'));
+      assert.ok(!JSON.stringify(backup).includes('fixture-secret-key'));
+      const broken = structuredClone(backup);
+      broken.documents[0].file = { extension: 'pdf', data: Buffer.from('not pdf').toString('base64') };
+      assert.equal((await request('/backup', 'POST', { backup: broken })).response.status, 400);
+      assert.equal((await request('/backup', 'POST', { backup })).response.status, 200);
+      assert.equal((await request('/applications')).result.length, 1);
+      assert.equal((await request(`/documents/${pdf.id}/file`)).response.status, 200);
+      await request('/auth/logout', 'POST', {});
+      assert.equal((await request('/profile')).response.status, 401);
+    } finally {
+      if (provider?.listening) {
+        provider.close();
+        await once(provider, 'close');
+      }
+      server.close();
+      await once(server, 'close');
+      await pool.end();
+    }
   }
-  try {
-    assert.equal((await request('/profile')).response.status,401);
-    assert.equal((await request('/health')).result.setupRequired,true);
-    assert.equal((await request('/auth/setup','POST',{name:'Test owner',password:'correct-test-password'})).response.status,201);
-    assert.equal((await request('/auth/session')).result.user.name,'Test owner');
-    const profile={name:'Test Person',email:'person@example.test',summary:'Built useful products.',projects:[{name:'Tracker',technologies:'React, MySQL'}]};
-    assert.equal((await request('/profile','PUT',profile)).response.status,200);
-    const document=(await request('/documents','POST',{type:'resume',title:'Test resume',content:profile})).result;
-    const application=(await request('/applications','POST',{company:'Example Co',role:'Developer',documentIds:[document.id]})).result;
-    assert.ok(application.id);
-    assert.equal((await request(`/applications/${application.id}`,'PATCH',{status:'Applied',appliedAt:'2026-01-02'})).result.history.length,2);
-    assert.equal((await request(`/documents/${document.id}`,'DELETE')).response.status,409);
-    const edited=(await request(`/documents/${document.id}`,'PATCH',{title:'Revised resume'})).result;
-    assert.notEqual(edited.id,document.id);
-    assert.equal((await request(`/documents/${document.id}`)).result.title,'Test resume');
-    const pdf=(await request(`/documents/${edited.id}/export`,'POST',{template:'modern',paper:'Letter',fontSize:11,margin:16})).result;
-    assert.ok(pdf.id,pdf.error);
-    const file=await request(`/documents/${pdf.id}/file`);
-    assert.equal(file.response.status,200);
-    assert.equal(file.result.subarray(0,5).toString(),'%PDF-');
-    const unknown=(await request('/ai','POST',{task:'cover',job:{description:'Job'}}));
-    assert.equal(unknown.response.status,503);
-    let providerResult={result:{matches:['Relevant experience'],gaps:[],suggestions:['Explain project outcomes'],keywords:['React'],score:75}};
-    let lastAIRequest;
-    provider=createServer(async(req,res)=>{
-      let body='';for await(const chunk of req)body+=chunk;
-      lastAIRequest={authorization:req.headers.authorization,body:JSON.parse(body)};
-      res.writeHead(200,{'Content-Type':'application/json'});
-      res.end(JSON.stringify({choices:[{message:{content:JSON.stringify(providerResult)}}]}));
-    }).listen(0,'127.0.0.1');
-    await once(provider,'listening');
-    const settings=await request('/settings','PUT',{aiBaseUrl:`http://127.0.0.1:${provider.address().port}/v1`,aiModel:'fixture-model',aiApiKey:'fixture-secret-key'});
-    assert.equal(settings.response.status,200);
-    assert.equal(settings.result.aiConfigured,true);
-    assert.ok(!JSON.stringify(settings.result).includes('fixture-secret-key'));
-    const compared=await request('/ai','POST',{task:'compare',profile,job:{description:'React developer'}});
-    assert.equal(compared.response.status,200);
-    assert.equal(compared.result.result.score,75);
-    assert.equal(lastAIRequest.authorization,'Bearer fixture-secret-key');
-    assert.ok(lastAIRequest.body.messages[0].content.includes('Never invent'));
-    const {profileSchema}=await import('../src/lib/schemas.js');
-    const savedProfile=(await request('/profile')).result;
-    providerResult={result:profileSchema.parse({name:'Imported Person',experience:[{company:'Example Co',title:'Developer',description:'- Built a dashboard.\n- Resolved support requests.'}],links:[{label:'Portfolio',url:'https://portfolio.example.test'}],skills:['React'],projects:[{name:'Portfolio'}]})};
-    providerResult.result.links[0].url='portfolio.example.test';
-    const extracted=await request('/ai','POST',{task:'profile',text:'Imported Person. React developer. Portfolio project.'});
-    assert.equal(extracted.response.status,200);
-    assert.equal(extracted.result.result.name,'Imported Person');
-    assert.equal(extracted.result.result.experience[0].description,'- Built a dashboard.\n- Resolved support requests.');
-    assert.equal(extracted.result.result.links[0].url,'https://portfolio.example.test/');
-    assert.equal(extracted.result.result.projects[0].name,'Portfolio');
-    assert.ok(lastAIRequest.body.messages[0].content.includes('never put the whole resume there'));
-    assert.equal((await request('/ai','POST',{task:'profile',text:'  '})).response.status,400);
-    providerResult={result:{}};
-    assert.equal((await request('/ai','POST',{task:'profile',text:'Imported Person'})).response.status,502);
-    assert.deepEqual((await request('/profile')).result,savedProfile);
-    const draftBefore=(await request('/preparation')).result;
-    providerResult={result:{}};
-    const malformed=await request('/ai','POST',{task:'resume',profile,job:{description:'React developer'}});
-    assert.equal(malformed.response.status,502);
-    assert.deepEqual((await request('/preparation')).result,draftBefore);
-    provider.close();await once(provider,'close');
-    assert.equal((await request('/ai','POST',{task:'cover',profile,job:{description:'React developer'}})).response.status,502);
-    const backup=(await request('/backup')).result;
-    assert.equal(backup.documents.length,3);
-    assert.ok(!JSON.stringify(backup).includes('password_hash'));
-    assert.ok(!JSON.stringify(backup).includes('fixture-secret-key'));
-    const broken=structuredClone(backup);broken.documents[0].file={extension:'pdf',data:Buffer.from('not pdf').toString('base64')};
-    assert.equal((await request('/backup','POST',{backup:broken})).response.status,400);
-    assert.equal((await request('/backup','POST',{backup})).response.status,200);
-    assert.equal((await request('/applications')).result.length,1);
-    assert.equal((await request(`/documents/${pdf.id}/file`)).response.status,200);
-    await request('/auth/logout','POST',{});
-    assert.equal((await request('/profile')).response.status,401);
-  } finally {
-    if(provider?.listening){provider.close();await once(provider,'close');}
-    server.close();await once(server,'close');await pool.end();
-  }
-});
+);

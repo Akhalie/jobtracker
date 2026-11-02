@@ -2,9 +2,163 @@ import { useState } from 'react';
 import { Download, Upload, Save, KeyRound, ShieldCheck, Database, Server } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { PageHeader, Card, Button, Field, Input, ErrorNote, Notice } from '../../components/ui/index.jsx';
-export default function Settings({settings,refresh}){
- const [base,setBase]=useState(settings.aiBaseUrl||'https://api.openai.com/v1'),[model,setModel]=useState(settings.aiModel||''),[key,setKey]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
- async function save(){setBusy(true);setError('');setNotice('');try{await api('/settings',{method:'PUT',body:{aiBaseUrl:base,aiModel:model,...(key.trim()?{aiApiKey:key.trim()}:{})}});setKey('');await refresh();setNotice('AI settings saved. The key is stored on the server and never returned to the browser.')}catch(e){setError(e.message)}finally{setBusy(false)}}
- async function restore(e){const file=e.target.files[0];if(!file)return;if(!confirm('Restore this backup? It will replace the current workspace records and files. Export a current backup first.')){e.target.value='';return}setBusy(true);setError('');try{const backup=JSON.parse(await file.text());await api('/backup',{method:'POST',body:{backup}});await refresh();sessionStorage.removeItem('folio-preparation-recovery');location.reload()}catch(e){setError(e.message)}finally{setBusy(false);e.target.value=''}}
- return <><PageHeader eyebrow="Make it yours" title="Settings" description="Your workspace, your data, your choice of AI."/><ErrorNote>{error}</ErrorNote><Notice>{notice}</Notice><div className="grid items-start gap-5 xl:grid-cols-[1.3fr_1fr]"><Card className="p-6"><div className="mb-5 flex items-center gap-3"><span className="rounded-lg bg-brand/10 p-2 text-brand"><KeyRound size={20}/></span><div><h2 className="font-semibold">AI provider</h2><p className="mt-1 text-xs text-slate-400">OpenAI-compatible API · {settings.aiConfigured?'Configured':'Not configured'}</p></div></div><div className="space-y-4"><Field label="API base URL"><Input value={base} onChange={e=>setBase(e.target.value)} placeholder="https://provider.example/v1"/></Field><Field label="Model"><Input value={model} onChange={e=>setModel(e.target.value)} placeholder="Model ID from your provider"/></Field><Field label={settings.aiConfigured?'API key — leave blank to keep current':'API key'}><Input type="password" autoComplete="new-password" value={key} onChange={e=>setKey(e.target.value)} placeholder={settings.aiConfigured?'•••••••• (saved on server)':'Paste API key'}/></Field><p className="text-xs leading-6 text-slate-500">Selected job and career information is sent to this provider when you use an AI action. Provider charges may apply. All manual editing, tracking, and PDF exports work without AI.</p><Button onClick={save} loading={busy} disabled={!base.trim()||!model.trim()}><Save size={15}/>Save AI settings</Button></div></Card><div className="space-y-5"><Card className="p-6"><div className="mb-4 flex items-center gap-3"><Database size={20} className="text-brand"/><h2 className="font-semibold">Backup & restore</h2></div><p className="mb-5 text-sm leading-6 text-slate-500">Export your profile, applications, documents, and files. Keep backups private: they contain personal information.</p><div className="flex flex-wrap gap-2"><a href="/api/backup" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"><Download size={15}/>Export backup</a><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"><Upload size={15}/>Restore backup<input className="sr-only" type="file" accept=".json" disabled={busy} onChange={restore}/></label></div></Card><Card className="p-6"><div className="mb-4 flex items-center gap-3"><ShieldCheck size={20} className="text-brand"/><h2 className="font-semibold">Self hosted workspace</h2></div><dl className="space-y-3 text-sm"><div className="flex justify-between"><dt className="text-slate-500">Database</dt><dd className="font-medium">MySQL</dd></div><div className="flex justify-between"><dt className="text-slate-500">Document storage</dt><dd className="font-medium">Local files</dd></div><div className="flex justify-between"><dt className="text-slate-500">PDF generation</dt><dd className="font-medium">Local</dd></div><div className="flex justify-between"><dt className="text-slate-500">Workspace</dt><dd className="font-medium">Single user</dd></div></dl></Card></div></div></>;
+
+export default function Settings({ settings, refresh }) {
+  const [base, setBase] = useState(settings.aiBaseUrl || 'https://api.openai.com/v1'),
+    [model, setModel] = useState(settings.aiModel || ''),
+    [key, setKey] = useState(''),
+    [error, setError] = useState(''),
+    [notice, setNotice] = useState(''),
+    [busy, setBusy] = useState(false);
+  async function save() {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await api('/settings', {
+        method: 'PUT',
+        body: { aiBaseUrl: base, aiModel: model, ...(key.trim() ? { aiApiKey: key.trim() } : {}) }
+      });
+      setKey('');
+      await refresh();
+      setNotice('AI settings saved. The key is stored on the server and never returned to the browser.');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function restore(e) {
+    const file = e.target.files[0];
+    if (!file) {
+      return;
+    }
+    if (
+      !confirm(
+        'Restore this backup? It will replace the current workspace records and files. Export a current backup first.'
+      )
+    ) {
+      e.target.value = '';
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const backup = JSON.parse(await file.text());
+      await api('/backup', { method: 'POST', body: { backup } });
+      await refresh();
+      sessionStorage.removeItem('folio-preparation-recovery');
+      location.reload();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+      e.target.value = '';
+    }
+  }
+  return (
+    <>
+      <PageHeader
+        eyebrow="Make it yours"
+        title="Settings"
+        description="Your workspace, your data, your choice of AI."
+      />
+      <ErrorNote>{error}</ErrorNote>
+      <Notice>{notice}</Notice>
+      <div className="grid items-start gap-5 xl:grid-cols-[1.3fr_1fr]">
+        <Card className="p-6">
+          <div className="mb-5 flex items-center gap-3">
+            <span className="rounded-lg bg-brand/10 p-2 text-brand">
+              <KeyRound size={20} />
+            </span>
+            <div>
+              <h2 className="font-semibold">AI provider</h2>
+              <p className="mt-1 text-xs text-slate-400">
+                OpenAI-compatible API · {settings.aiConfigured ? 'Configured' : 'Not configured'}
+              </p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <Field label="API base URL">
+              <Input value={base} onChange={(e) => setBase(e.target.value)} placeholder="https://provider.example/v1" />
+            </Field>
+            <Field label="Model">
+              <Input
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder="Model ID from your provider"
+              />
+            </Field>
+            <Field label={settings.aiConfigured ? 'API key — leave blank to keep current' : 'API key'}>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={key}
+                onChange={(e) => setKey(e.target.value)}
+                placeholder={settings.aiConfigured ? '•••••••• (saved on server)' : 'Paste API key'}
+              />
+            </Field>
+            <p className="text-xs leading-6 text-slate-500">
+              Selected job and career information is sent to this provider when you use an AI action. Provider charges
+              may apply. All manual editing, tracking, and PDF exports work without AI.
+            </p>
+            <Button onClick={save} loading={busy} disabled={!base.trim() || !model.trim()}>
+              <Save size={15} />
+              Save AI settings
+            </Button>
+          </div>
+        </Card>
+        <div className="space-y-5">
+          <Card className="p-6">
+            <div className="mb-4 flex items-center gap-3">
+              <Database size={20} className="text-brand" />
+              <h2 className="font-semibold">Backup & restore</h2>
+            </div>
+            <p className="mb-5 text-sm leading-6 text-slate-500">
+              Export your profile, applications, documents, and files. Keep backups private: they contain personal
+              information.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="/api/backup"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
+              >
+                <Download size={15} />
+                Export backup
+              </a>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold">
+                <Upload size={15} />
+                Restore backup
+                <input className="sr-only" type="file" accept=".json" disabled={busy} onChange={restore} />
+              </label>
+            </div>
+          </Card>
+          <Card className="p-6">
+            <div className="mb-4 flex items-center gap-3">
+              <ShieldCheck size={20} className="text-brand" />
+              <h2 className="font-semibold">Self hosted workspace</h2>
+            </div>
+            <dl className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Database</dt>
+                <dd className="font-medium">MySQL</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Document storage</dt>
+                <dd className="font-medium">Local files</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">PDF generation</dt>
+                <dd className="font-medium">Local</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Workspace</dt>
+                <dd className="font-medium">Single user</dd>
+              </div>
+            </dl>
+          </Card>
+        </div>
+      </div>
+    </>
+  );
 }

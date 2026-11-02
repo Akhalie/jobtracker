@@ -1,27 +1,586 @@
 import { useState } from 'react';
-import { Plus, Search, LayoutList, Columns3, ArrowUpRight, CalendarDays, Trash2, Save, Check, FileText, ExternalLink } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  LayoutList,
+  Columns3,
+  ArrowUpRight,
+  CalendarDays,
+  Trash2,
+  Save,
+  Check,
+  FileText,
+  ExternalLink
+} from 'lucide-react';
 import { api, statuses, dateText, safeUrl } from '../../lib/api.js';
 import DocumentViewer from '../../components/DocumentViewer.jsx';
-import { PageHeader, Card, Button, Field, Input, Textarea, Select, Empty, ErrorNote, Modal, Badge, Notice } from '../../components/ui/index.jsx';
-function localDateTime(value){if(!value)return '';const d=new Date(value);if(Number.isNaN(d.getTime()))return '';return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16)}
-const blank=()=>({company:'',role:'',description:'',url:'',location:'',salary:'',status:'Saved',appliedAt:'',channel:'',contact:'',notes:'',interviews:[],tasks:[],documentIds:[]});
-export default function Applications({applications,documents,refresh,initialStatus}){
- const [query,setQuery]=useState(''),[status,setStatus]=useState(initialStatus||''),[view,setView]=useState('table'),[selected,setSelected]=useState(null),[creating,setCreating]=useState(false),[error,setError]=useState(''),[viewer,setViewer]=useState(null);
- const list=applications.filter(a=>(!status||(status==='Pending'?!['Accepted','Rejected','Withdrawn','Archived'].includes(a.status):a.status===status))&&`${a.company} ${a.role} ${a.location}`.toLowerCase().includes(query.toLowerCase()));
- async function remove(a){if(!confirm(`Delete the application for ${a.role} at ${a.company}? Your documents will remain in the library.`))return;try{await api(`/applications/${a.id}`,{method:'DELETE'});setSelected(null);await refresh()}catch(e){setError(e.message)}}
- return <><PageHeader eyebrow="Your search, organized" title="Applications" description="Every opportunity in one place. Add an application directly, with or without tailored documents."><Button onClick={()=>{setCreating(true);setSelected(blank())}}><Plus size={15}/>Add application</Button></PageHeader><ErrorNote>{error}</ErrorNote><div className="mb-5 flex flex-wrap items-center gap-3"><div className="min-w-48 flex-1"><Input aria-label="Search applications" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search company, role, or location…"/></div><div className="w-44"><Select aria-label="Filter status" value={status} onChange={e=>setStatus(e.target.value)}><option value="">All stages</option><option value="Pending">Pending outcomes</option>{statuses.map(s=><option key={s}>{s}</option>)}</Select></div><div className="flex rounded-lg border border-slate-200 bg-white p-1"><button aria-label="Table view" aria-pressed={view==='table'} onClick={()=>setView('table')} className={`rounded-md p-2 ${view==='table'?'bg-brand/10 text-brand':'text-slate-400'}`}><LayoutList size={17}/></button><button aria-label="Board view" aria-pressed={view==='board'} onClick={()=>setView('board')} className={`rounded-md p-2 ${view==='board'?'bg-brand/10 text-brand':'text-slate-400'}`}><Columns3 size={17}/></button></div></div>
- {!list.length?<Card><Empty title={query||status?'No matching applications':'Your next opportunity starts here'} description="Add an application you have already submitted, save a job for later, or prepare a tailored package." ><Button onClick={()=>{setCreating(true);setSelected(blank())}}><Plus size={15}/>Add application</Button></Empty></Card>:view==='table'?<Card className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b border-slate-200 bg-slate-50/70 text-[11px] uppercase tracking-wider text-slate-400"><tr>{['Opportunity','Stage','Location','Applied','Documents',''].map((h,i)=><th key={i} className="px-5 py-4 font-semibold">{h}</th>)}</tr></thead><tbody>{list.map(a=><tr key={a.id} className="border-b border-slate-100 last:border-0 hover:bg-canvas/50"><td className="px-5 py-4"><button onClick={()=>{setCreating(false);setSelected(a)}} className="text-left"><span className="block font-semibold text-ink">{a.role}</span><span className="mt-1 block text-xs text-slate-500">{a.company}</span></button></td><td className="px-5 py-4"><Badge>{a.status}</Badge></td><td className="px-5 py-4 text-slate-500">{a.location||'—'}</td><td className="whitespace-nowrap px-5 py-4 text-slate-500">{dateText(a.appliedAt)}</td><td className="px-5 py-4 text-slate-500">{a.documentIds?.length||0}</td><td className="px-5 py-4"><button aria-label={`View ${a.role} at ${a.company}`} onClick={()=>{setCreating(false);setSelected(a)}} className="rounded-lg p-2 text-slate-400 hover:bg-brand/10 hover:text-brand"><ArrowUpRight size={17}/></button></td></tr>)}</tbody></table></div><p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">{list.length} {list.length===1?'application':'applications'}</p></Card>:<div className="flex gap-4 overflow-x-auto pb-4">{(status==='Pending'?statuses.filter(s=>!['Accepted','Rejected','Withdrawn','Archived'].includes(s)):status?[status]:statuses).map(s=><section key={s} className="w-72 shrink-0 rounded-xl bg-slate-100/70 p-3"><div className="mb-3 flex items-center justify-between px-1"><Badge>{s}</Badge><span className="text-xs text-slate-400">{list.filter(a=>a.status===s).length}</span></div><div className="space-y-3">{list.filter(a=>a.status===s).map(a=><button key={a.id} onClick={()=>{setCreating(false);setSelected(a)}} className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-brand/40"><h3 className="font-semibold">{a.role}</h3><p className="mt-1 text-sm text-slate-500">{a.company}</p><p className="mt-4 text-xs text-slate-400">{a.location||'Location not specified'}</p><div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-400"><span>{dateText(a.appliedAt||a.createdAt)}</span><ArrowUpRight size={14}/></div></button>)}</div></section>)}</div>}
- {selected && <ApplicationDetail key={selected.id||'new'} initial={selected} creating={creating} documents={documents} onClose={()=>setSelected(null)} onSave={async()=>{await refresh();setSelected(null)}} onDelete={()=>remove(selected)} onView={setViewer}/>}{viewer && <DocumentViewer document={viewer} onClose={()=>setViewer(null)} refresh={refresh}/>}</>;
+import {
+  PageHeader,
+  Card,
+  Button,
+  Field,
+  Input,
+  Textarea,
+  Select,
+  Empty,
+  ErrorNote,
+  Modal,
+  Badge,
+  Notice
+} from '../../components/ui/index.jsx';
+
+function localDateTime(value) {
+  if (!value) {
+    return '';
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    return '';
+  }
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
-function ApplicationDetail({initial,creating,documents,onClose,onSave,onDelete,onView}){
- const [value,setValue]=useState({...blank(),...initial}),[tab,setTab]=useState('details'),[busy,setBusy]=useState(false),[error,setError]=useState('');const set=(k,v)=>setValue(p=>({...p,[k]:v}));
- async function save(e){e?.preventDefault();setBusy(true);setError('');try{const body={...value,appliedAt:value.appliedAt||null};delete body.id;delete body.history;delete body.createdAt;delete body.updatedAt;await api(creating?'/applications':`/applications/${initial.id}`,{method:creating?'POST':'PATCH',body});await onSave()}catch(e){setError(e.message)}finally{setBusy(false)}}
- function arraySet(key,index,field,val){set(key,value[key].map((r,i)=>i===index?{...r,[field]:val}:r))}
- return <Modal title={creating?'Add an application':`${initial.role} · ${initial.company}`} wide onClose={onClose}><ErrorNote>{error}</ErrorNote><div className="mb-5 flex flex-wrap gap-1 border-b border-slate-200 pb-3">{[['details','Details'],['interviews','Interviews'],['tasks','Follow-ups'],['documents','Documents'],['history','History']].filter(([k])=>!creating||k!=='history').map(([k,label])=><button key={k} onClick={()=>setTab(k)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${tab===k?'bg-brand/10 text-brand':'text-slate-500 hover:bg-slate-100'}`}>{label}</button>)}</div>
- {tab==='details'&&<div className="grid gap-4 sm:grid-cols-2">{[['company','Company *'],['role','Role *'],['location','Location'],['salary','Salary / range'],['url','Job URL'],['contact','Recruiter / contact'],['channel','Submission channel']].map(([k,label])=><Field key={k} label={label}><Input value={value[k]||''} onChange={e=>set(k,e.target.value)} required={['company','role'].includes(k)}/></Field>)}<Field label="Stage"><Select value={value.status} onChange={e=>set('status',e.target.value)}>{statuses.map(s=><option key={s}>{s}</option>)}</Select></Field><Field label="Submission date"><Input type="date" value={value.appliedAt?.slice(0,10)||''} onChange={e=>set('appliedAt',e.target.value)}/></Field>{safeUrl(value.url)&&<div className="flex items-end pb-3"><a href={safeUrl(value.url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-brand underline"><ExternalLink size={14}/>Open job posting</a></div>}<Field label="Job description" className="sm:col-span-2"><Textarea rows={6} value={value.description} onChange={e=>set('description',e.target.value)}/></Field><Field label="Notes" className="sm:col-span-2"><Textarea rows={5} value={value.notes} onChange={e=>set('notes',e.target.value)}/></Field></div>}
- {tab==='interviews'&&<div><div className="mb-4 flex items-center justify-between"><p className="text-sm text-slate-500">Record rounds, links, and interview notes.</p><Button variant="secondary" onClick={()=>set('interviews',[...value.interviews,{id:crypto.randomUUID(),title:'',date:'',url:'',notes:''}])}><Plus size={14}/>Add interview</Button></div>{!value.interviews.length&&<Empty title="No interviews yet" description="Add a scheduled conversation when one comes in."/>}<div className="space-y-4">{value.interviews.map((r,i)=><Card key={r.id||i} className="p-4"><div className="mb-3 flex justify-between"><Badge>Round {i+1}</Badge><button aria-label={`Remove interview ${i+1}`} className="p-1 text-slate-400 hover:text-rose-600" onClick={()=>set('interviews',value.interviews.filter((_,n)=>n!==i))}><Trash2 size={15}/></button></div><div className="grid gap-3 sm:grid-cols-2"><Field label="Round / title"><Input value={r.title} onChange={e=>arraySet('interviews',i,'title',e.target.value)}/></Field><Field label="Date and time"><Input type="datetime-local" value={localDateTime(r.date)} onChange={e=>arraySet('interviews',i,'date',e.target.value?new Date(e.target.value).toISOString():'')}/></Field><Field label="Meeting link" className="sm:col-span-2"><Input value={r.url} onChange={e=>arraySet('interviews',i,'url',e.target.value)}/></Field><Field label="Notes / feedback" className="sm:col-span-2"><Textarea value={r.notes} onChange={e=>arraySet('interviews',i,'notes',e.target.value)}/></Field></div></Card>)}</div></div>}
- {tab==='tasks'&&<div><div className="mb-4 flex items-center justify-between"><p className="text-sm text-slate-500">Keep track of the next useful action.</p><Button variant="secondary" onClick={()=>set('tasks',[...value.tasks,{id:crypto.randomUUID(),title:'',due:'',done:false}])}><Plus size={14}/>Add follow-up</Button></div>{!value.tasks.length&&<Empty title="Nothing to follow up yet" description="Add reminders for actions you want to take."/>}<div className="space-y-3">{value.tasks.map((r,i)=><Card key={r.id||i} className="p-4"><div className="flex items-center gap-3"><label className="flex items-center gap-2 text-xs text-slate-500"><input aria-label={`Complete ${r.title||'task'}`} type="checkbox" checked={r.done} onChange={e=>arraySet('tasks',i,'done',e.target.checked)} className="h-4 w-4 accent-brand"/>Done</label><div className="flex-1"><Input aria-label="Follow-up task" value={r.title} onChange={e=>arraySet('tasks',i,'title',e.target.value)} placeholder="Task description"/></div><button aria-label="Remove follow-up" className="p-1 text-slate-400 hover:text-rose-600" onClick={()=>set('tasks',value.tasks.filter((_,n)=>n!==i))}><Trash2 size={15}/></button></div><Field label="Due date" className="mt-3 max-w-xs"><Input type="date" value={r.due?.slice(0,10)||''} onChange={e=>arraySet('tasks',i,'due',e.target.value)}/></Field></Card>)}</div></div>}
- {tab==='documents'&&<div><p className="mb-4 text-sm text-slate-500">Attach existing documents to this application. You can track applications without preparing documents here.</p>{!documents.length&&<Empty title="No documents in your library" description="Upload or create a resume or cover letter in the document library, then attach it here."/>}<div className="space-y-2">{documents.map(doc=><div key={doc.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3"><input type="checkbox" aria-label={`Attach ${doc.title}`} checked={value.documentIds.includes(doc.id)} onChange={e=>set('documentIds',e.target.checked?[...value.documentIds,doc.id]:value.documentIds.filter(id=>id!==doc.id))} className="h-4 w-4 accent-brand"/><FileText size={18} className="text-brand"/><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{doc.title}</p><p className="text-xs text-slate-400">{doc.type==='resume'?'Resume / CV':'Cover letter'} · {dateText(doc.createdAt)}</p></div><button onClick={()=>onView(doc)} className="text-xs font-semibold text-brand hover:underline">View {doc.type==='resume'?'resume/CV':'letter'}</button></div>)}</div></div>}
- {tab==='history'&&<div className="space-y-4">{(initial.history||[]).slice().reverse().map((h,i)=><div key={i} className="flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-4"><span className="h-2.5 w-2.5 rounded-full bg-brand"/><Badge>{h.status}</Badge><span className="text-xs text-slate-400">{dateText(h.at)}</span></div>)}{!initial.history?.length&&<p className="text-sm text-slate-400">No stage changes recorded.</p>}</div>}
- <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5">{!creating?<Button variant="danger" onClick={onDelete}><Trash2 size={14}/>Delete</Button>:<span/>}<div className="flex gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} disabled={!value.company.trim()||!value.role.trim()} loading={busy}><Save size={14}/>{creating?'Add application':'Save changes'}</Button></div></div></Modal>;
+const blank = () => ({
+  company: '',
+  role: '',
+  description: '',
+  url: '',
+  location: '',
+  salary: '',
+  status: 'Saved',
+  appliedAt: '',
+  channel: '',
+  contact: '',
+  notes: '',
+  interviews: [],
+  tasks: [],
+  documentIds: []
+});
+export default function Applications({ applications, documents, refresh, initialStatus }) {
+  const [query, setQuery] = useState(''),
+    [status, setStatus] = useState(initialStatus || ''),
+    [view, setView] = useState('table'),
+    [selected, setSelected] = useState(null),
+    [creating, setCreating] = useState(false),
+    [error, setError] = useState(''),
+    [viewer, setViewer] = useState(null);
+  const list = applications.filter(
+    (a) =>
+      (!status ||
+        (status === 'Pending'
+          ? !['Accepted', 'Rejected', 'Withdrawn', 'Archived'].includes(a.status)
+          : a.status === status)) &&
+      `${a.company} ${a.role} ${a.location}`.toLowerCase().includes(query.toLowerCase())
+  );
+  async function remove(a) {
+    if (!confirm(`Delete the application for ${a.role} at ${a.company}? Your documents will remain in the library.`)) {
+      return;
+    }
+    try {
+      await api(`/applications/${a.id}`, { method: 'DELETE' });
+      setSelected(null);
+      await refresh();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  return (
+    <>
+      <PageHeader
+        eyebrow="Your search, organized"
+        title="Applications"
+        description="Every opportunity in one place. Add an application directly, with or without tailored documents."
+      >
+        <Button
+          onClick={() => {
+            setCreating(true);
+            setSelected(blank());
+          }}
+        >
+          <Plus size={15} />
+          Add application
+        </Button>
+      </PageHeader>
+      <ErrorNote>{error}</ErrorNote>
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <div className="min-w-48 flex-1">
+          <Input
+            aria-label="Search applications"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search company, role, or location…"
+          />
+        </div>
+        <div className="w-44">
+          <Select aria-label="Filter status" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">All stages</option>
+            <option value="Pending">Pending outcomes</option>
+            {statuses.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex rounded-lg border border-slate-200 bg-white p-1">
+          <button
+            aria-label="Table view"
+            aria-pressed={view === 'table'}
+            onClick={() => setView('table')}
+            className={`rounded-md p-2 ${view === 'table' ? 'bg-brand/10 text-brand' : 'text-slate-400'}`}
+          >
+            <LayoutList size={17} />
+          </button>
+          <button
+            aria-label="Board view"
+            aria-pressed={view === 'board'}
+            onClick={() => setView('board')}
+            className={`rounded-md p-2 ${view === 'board' ? 'bg-brand/10 text-brand' : 'text-slate-400'}`}
+          >
+            <Columns3 size={17} />
+          </button>
+        </div>
+      </div>
+      {!list.length ? (
+        <Card>
+          <Empty
+            title={query || status ? 'No matching applications' : 'Your next opportunity starts here'}
+            description="Add an application you have already submitted, save a job for later, or prepare a tailored package."
+          >
+            <Button
+              onClick={() => {
+                setCreating(true);
+                setSelected(blank());
+              }}
+            >
+              <Plus size={15} />
+              Add application
+            </Button>
+          </Empty>
+        </Card>
+      ) : view === 'table' ? (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50/70 text-[11px] uppercase tracking-wider text-slate-400">
+                <tr>
+                  {['Opportunity', 'Stage', 'Location', 'Applied', 'Documents', ''].map((h, i) => (
+                    <th key={i} className="px-5 py-4 font-semibold">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((a) => (
+                  <tr key={a.id} className="border-b border-slate-100 last:border-0 hover:bg-canvas/50">
+                    <td className="px-5 py-4">
+                      <button
+                        onClick={() => {
+                          setCreating(false);
+                          setSelected(a);
+                        }}
+                        className="text-left"
+                      >
+                        <span className="block font-semibold text-ink">{a.role}</span>
+                        <span className="mt-1 block text-xs text-slate-500">{a.company}</span>
+                      </button>
+                    </td>
+                    <td className="px-5 py-4">
+                      <Badge>{a.status}</Badge>
+                    </td>
+                    <td className="px-5 py-4 text-slate-500">{a.location || '—'}</td>
+                    <td className="whitespace-nowrap px-5 py-4 text-slate-500">{dateText(a.appliedAt)}</td>
+                    <td className="px-5 py-4 text-slate-500">{a.documentIds?.length || 0}</td>
+                    <td className="px-5 py-4">
+                      <button
+                        aria-label={`View ${a.role} at ${a.company}`}
+                        onClick={() => {
+                          setCreating(false);
+                          setSelected(a);
+                        }}
+                        className="rounded-lg p-2 text-slate-400 hover:bg-brand/10 hover:text-brand"
+                      >
+                        <ArrowUpRight size={17} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-400">
+            {list.length} {list.length === 1 ? 'application' : 'applications'}
+          </p>
+        </Card>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {(status === 'Pending'
+            ? statuses.filter((s) => !['Accepted', 'Rejected', 'Withdrawn', 'Archived'].includes(s))
+            : status
+              ? [status]
+              : statuses
+          ).map((s) => (
+            <section key={s} className="w-72 shrink-0 rounded-xl bg-slate-100/70 p-3">
+              <div className="mb-3 flex items-center justify-between px-1">
+                <Badge>{s}</Badge>
+                <span className="text-xs text-slate-400">{list.filter((a) => a.status === s).length}</span>
+              </div>
+              <div className="space-y-3">
+                {list
+                  .filter((a) => a.status === s)
+                  .map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => {
+                        setCreating(false);
+                        setSelected(a);
+                      }}
+                      className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-brand/40"
+                    >
+                      <h3 className="font-semibold">{a.role}</h3>
+                      <p className="mt-1 text-sm text-slate-500">{a.company}</p>
+                      <p className="mt-4 text-xs text-slate-400">{a.location || 'Location not specified'}</p>
+                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-400">
+                        <span>{dateText(a.appliedAt || a.createdAt)}</span>
+                        <ArrowUpRight size={14} />
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+      {selected && (
+        <ApplicationDetail
+          key={selected.id || 'new'}
+          initial={selected}
+          creating={creating}
+          documents={documents}
+          onClose={() => setSelected(null)}
+          onSave={async () => {
+            await refresh();
+            setSelected(null);
+          }}
+          onDelete={() => remove(selected)}
+          onView={setViewer}
+        />
+      )}
+      {viewer && <DocumentViewer document={viewer} onClose={() => setViewer(null)} refresh={refresh} />}
+    </>
+  );
+}
+function ApplicationDetail({ initial, creating, documents, onClose, onSave, onDelete, onView }) {
+  const [value, setValue] = useState({ ...blank(), ...initial }),
+    [tab, setTab] = useState('details'),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState('');
+  const set = (k, v) => setValue((p) => ({ ...p, [k]: v }));
+  async function save(e) {
+    e?.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const body = { ...value, appliedAt: value.appliedAt || null };
+      delete body.id;
+      delete body.history;
+      delete body.createdAt;
+      delete body.updatedAt;
+      await api(creating ? '/applications' : `/applications/${initial.id}`, {
+        method: creating ? 'POST' : 'PATCH',
+        body
+      });
+      await onSave();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  function arraySet(key, index, field, val) {
+    set(
+      key,
+      value[key].map((r, i) => (i === index ? { ...r, [field]: val } : r))
+    );
+  }
+  return (
+    <Modal title={creating ? 'Add an application' : `${initial.role} · ${initial.company}`} wide onClose={onClose}>
+      <ErrorNote>{error}</ErrorNote>
+      <div className="mb-5 flex flex-wrap gap-1 border-b border-slate-200 pb-3">
+        {[
+          ['details', 'Details'],
+          ['interviews', 'Interviews'],
+          ['tasks', 'Follow-ups'],
+          ['documents', 'Documents'],
+          ['history', 'History']
+        ]
+          .filter(([k]) => !creating || k !== 'history')
+          .map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold ${tab === k ? 'bg-brand/10 text-brand' : 'text-slate-500 hover:bg-slate-100'}`}
+            >
+              {label}
+            </button>
+          ))}
+      </div>
+      {tab === 'details' && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[
+            ['company', 'Company *'],
+            ['role', 'Role *'],
+            ['location', 'Location'],
+            ['salary', 'Salary / range'],
+            ['url', 'Job URL'],
+            ['contact', 'Recruiter / contact'],
+            ['channel', 'Submission channel']
+          ].map(([k, label]) => (
+            <Field key={k} label={label}>
+              <Input
+                value={value[k] || ''}
+                onChange={(e) => set(k, e.target.value)}
+                required={['company', 'role'].includes(k)}
+              />
+            </Field>
+          ))}
+          <Field label="Stage">
+            <Select value={value.status} onChange={(e) => set('status', e.target.value)}>
+              {statuses.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Submission date">
+            <Input
+              type="date"
+              value={value.appliedAt?.slice(0, 10) || ''}
+              onChange={(e) => set('appliedAt', e.target.value)}
+            />
+          </Field>
+          {safeUrl(value.url) && (
+            <div className="flex items-end pb-3">
+              <a
+                href={safeUrl(value.url)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-brand underline"
+              >
+                <ExternalLink size={14} />
+                Open job posting
+              </a>
+            </div>
+          )}
+          <Field label="Job description" className="sm:col-span-2">
+            <Textarea rows={6} value={value.description} onChange={(e) => set('description', e.target.value)} />
+          </Field>
+          <Field label="Notes" className="sm:col-span-2">
+            <Textarea rows={5} value={value.notes} onChange={(e) => set('notes', e.target.value)} />
+          </Field>
+        </div>
+      )}
+      {tab === 'interviews' && (
+        <div>
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-sm text-slate-500">Record rounds, links, and interview notes.</p>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                set('interviews', [
+                  ...value.interviews,
+                  { id: crypto.randomUUID(), title: '', date: '', url: '', notes: '' }
+                ])
+              }
+            >
+              <Plus size={14} />
+              Add interview
+            </Button>
+          </div>
+          {!value.interviews.length && (
+            <Empty title="No interviews yet" description="Add a scheduled conversation when one comes in." />
+          )}
+          <div className="space-y-4">
+            {value.interviews.map((r, i) => (
+              <Card key={r.id || i} className="p-4">
+                <div className="mb-3 flex justify-between">
+                  <Badge>Round {i + 1}</Badge>
+                  <button
+                    aria-label={`Remove interview ${i + 1}`}
+                    className="p-1 text-slate-400 hover:text-rose-600"
+                    onClick={() =>
+                      set(
+                        'interviews',
+                        value.interviews.filter((_, n) => n !== i)
+                      )
+                    }
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Round / title">
+                    <Input value={r.title} onChange={(e) => arraySet('interviews', i, 'title', e.target.value)} />
+                  </Field>
+                  <Field label="Date and time">
+                    <Input
+                      type="datetime-local"
+                      value={localDateTime(r.date)}
+                      onChange={(e) =>
+                        arraySet('interviews', i, 'date', e.target.value ? new Date(e.target.value).toISOString() : '')
+                      }
+                    />
+                  </Field>
+                  <Field label="Meeting link" className="sm:col-span-2">
+                    <Input value={r.url} onChange={(e) => arraySet('interviews', i, 'url', e.target.value)} />
+                  </Field>
+                  <Field label="Notes / feedback" className="sm:col-span-2">
+                    <Textarea value={r.notes} onChange={(e) => arraySet('interviews', i, 'notes', e.target.value)} />
+                  </Field>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+      {tab === 'tasks' && (
+        <div>
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-sm text-slate-500">Keep track of the next useful action.</p>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                set('tasks', [...value.tasks, { id: crypto.randomUUID(), title: '', due: '', done: false }])
+              }
+            >
+              <Plus size={14} />
+              Add follow-up
+            </Button>
+          </div>
+          {!value.tasks.length && (
+            <Empty title="Nothing to follow up yet" description="Add reminders for actions you want to take." />
+          )}
+          <div className="space-y-3">
+            {value.tasks.map((r, i) => (
+              <Card key={r.id || i} className="p-4">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 text-xs text-slate-500">
+                    <input
+                      aria-label={`Complete ${r.title || 'task'}`}
+                      type="checkbox"
+                      checked={r.done}
+                      onChange={(e) => arraySet('tasks', i, 'done', e.target.checked)}
+                      className="h-4 w-4 accent-brand"
+                    />
+                    Done
+                  </label>
+                  <div className="flex-1">
+                    <Input
+                      aria-label="Follow-up task"
+                      value={r.title}
+                      onChange={(e) => arraySet('tasks', i, 'title', e.target.value)}
+                      placeholder="Task description"
+                    />
+                  </div>
+                  <button
+                    aria-label="Remove follow-up"
+                    className="p-1 text-slate-400 hover:text-rose-600"
+                    onClick={() =>
+                      set(
+                        'tasks',
+                        value.tasks.filter((_, n) => n !== i)
+                      )
+                    }
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+                <Field label="Due date" className="mt-3 max-w-xs">
+                  <Input
+                    type="date"
+                    value={r.due?.slice(0, 10) || ''}
+                    onChange={(e) => arraySet('tasks', i, 'due', e.target.value)}
+                  />
+                </Field>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+      {tab === 'documents' && (
+        <div>
+          <p className="mb-4 text-sm text-slate-500">
+            Attach existing documents to this application. You can track applications without preparing documents here.
+          </p>
+          {!documents.length && (
+            <Empty
+              title="No documents in your library"
+              description="Upload or create a resume or cover letter in the document library, then attach it here."
+            />
+          )}
+          <div className="space-y-2">
+            {documents.map((doc) => (
+              <div key={doc.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
+                <input
+                  type="checkbox"
+                  aria-label={`Attach ${doc.title}`}
+                  checked={value.documentIds.includes(doc.id)}
+                  onChange={(e) =>
+                    set(
+                      'documentIds',
+                      e.target.checked
+                        ? [...value.documentIds, doc.id]
+                        : value.documentIds.filter((id) => id !== doc.id)
+                    )
+                  }
+                  className="h-4 w-4 accent-brand"
+                />
+                <FileText size={18} className="text-brand" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{doc.title}</p>
+                  <p className="text-xs text-slate-400">
+                    {doc.type === 'resume' ? 'Resume / CV' : 'Cover letter'} · {dateText(doc.createdAt)}
+                  </p>
+                </div>
+                <button onClick={() => onView(doc)} className="text-xs font-semibold text-brand hover:underline">
+                  View {doc.type === 'resume' ? 'resume/CV' : 'letter'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {tab === 'history' && (
+        <div className="space-y-4">
+          {(initial.history || [])
+            .slice()
+            .reverse()
+            .map((h, i) => (
+              <div key={i} className="flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-4">
+                <span className="h-2.5 w-2.5 rounded-full bg-brand" />
+                <Badge>{h.status}</Badge>
+                <span className="text-xs text-slate-400">{dateText(h.at)}</span>
+              </div>
+            ))}
+          {!initial.history?.length && <p className="text-sm text-slate-400">No stage changes recorded.</p>}
+        </div>
+      )}
+      <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-5">
+        {!creating ? (
+          <Button variant="danger" onClick={onDelete}>
+            <Trash2 size={14} />
+            Delete
+          </Button>
+        ) : (
+          <span />
+        )}
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={!value.company.trim() || !value.role.trim()} loading={busy}>
+            <Save size={14} />
+            {creating ? 'Add application' : 'Save changes'}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
 }

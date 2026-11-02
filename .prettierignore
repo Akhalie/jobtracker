@@ -1,0 +1,11 @@
+node_modules/
+client/dist/
+.local/
+storage/
+backups/
+test-results/
+playwright-report/
+.agent/
+.agents/
+.env*
+*.log
